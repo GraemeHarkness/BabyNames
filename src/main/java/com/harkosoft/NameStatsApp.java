@@ -3,6 +3,7 @@ package com.harkosoft;
 import java.io.PrintStream;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.List;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
@@ -30,17 +31,17 @@ public class NameStatsApp {
 				.map(pair -> pair._2);
 
 		JavaRDD<String> usageOverTime = popularRecords.map(findUsedUnusedTransitionsOverTime());
-		JavaRDD<String> perpetuals = usageOverTime.filter(line -> line.contains("|Y|"));
-		JavaRDD<String> gones = usageOverTime.filter(line -> line.contains("|Y.|"));
-		JavaRDD<String> news = usageOverTime.filter(line -> line.contains("|.Y|"));
+		List<String> perpetuals = usageOverTime.filter(line -> line.contains("|Y|")).collect();
+		List<String> gones = usageOverTime.filter(line -> line.contains("|Y.|")).collect();
+		List<String> news = usageOverTime.filter(line -> line.contains("|.Y|")).collect();
 
-		System.out.println("PERPETUALS: " + perpetuals.count());
+		System.out.println("PERPETUALS: " + perpetuals.size());
 		print(perpetuals, System.out);
 
-		System.out.println("GONES: " + gones.count());
+		System.out.println("GONES: " + gones.size());
 		print(gones, System.out);
 
-		System.out.println("NEWS: " + news.count());
+		System.out.println("NEWS: " + news.size());
 		print(news, System.out);
 
 		ctx.close();
@@ -75,14 +76,18 @@ public class NameStatsApp {
 	private static Function<Iterable<NameYearCountPojo>, String> findUsedUnusedTransitionsOverTime() {
 		return iRecords -> {
 			Set<Integer> yearsUsed = makeSetOfYearsInWhichNameWasUsed(iRecords);
-			StringBuilder statusBuilder = new StringBuilder(iRecords.iterator().next().getGenderNameKey() + ": ");
+			StringBuilder statusBuilder = new StringBuilder();
 			StringBuilder yearBuilder = new StringBuilder();
+
+            NameYearCountPojo first = iRecords.iterator().next();
+
+			statusBuilder.append( String.format( "%-40s: ", first.getGenderNameKey() ));
 
 			State currentState = State.START;
 			statusBuilder.append(currentState.toString());
 			for (int year = 1974; year < 2015; ++year) {
 				final State thisYearsState = yearsUsed.contains(year) ? State.NAME_USED : State.NAME_UNUSED;
-				yearBuilder.append((thisYearsState == State.NAME_USED) ? String.format("%02d", year % CENTURY) : "-");
+				yearBuilder.append((thisYearsState == State.NAME_USED) ? String.format("%02d", year % CENTURY) : "--");
 				yearBuilder.append(" ");
 				if (thisYearsState != currentState) {
 					currentState = thisYearsState;
@@ -112,8 +117,8 @@ public class NameStatsApp {
 		};
 	}
 
-	private static void print(JavaRDD<String> blob, PrintStream out) {
-		for (String output : blob.collect()) {
+	private static void print(List<String> blob, PrintStream out) {
+		for (String output : blob) {
 			out.println(output);
 		}
 	}
